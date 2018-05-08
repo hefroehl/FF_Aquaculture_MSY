@@ -1,5 +1,4 @@
 # Calculate MSY, Fmsy based on life histories and selectivity from RAM 
-
 library(dplyr)
 library(ggplot2)
 library(RColorBrewer)
@@ -10,9 +9,9 @@ marine.df <- read.csv('marinecatches.csv')
 
 feed.history <- read.csv('Feed projection.csv') # Feed projections 
 #feed.projection <- read.csv('ALL_ForageFish_results.csv')
-feed.projection <- read.csv('New_Estimates2.csv')
+feed.projection <- read.csv('scenarios.csv')
 
-
+CatchMSY <- read.csv('CatchMSY_Nis_FAOAreas.csv')
 
 
 # Sum Catches over year and size 
@@ -34,7 +33,6 @@ p2 <- ggplot(data= marine.df.sum[marine.df.sum$size == 'Small',], aes(x = Year, 
 p2
 
 df.Forage <- marine.df[marine.df$size == 'Small',] # Subset of catches that are forage fish
-
 df.Forage$stock <- paste(df.Forage$Species,df.Forage$Fishingarea, sep = '-') # Unique FAO stock
 
 sp <- unique(df.Forage$Species)
@@ -57,7 +55,7 @@ df.2010exp <- data.frame(Species = df.2010$Species[1:20], Catch = df.2010$Catch[
 
 #write.table(df.2010exp, file = 'forage20exp.csv', sep = '\t',row.names = F)
 
-sumForage <- df.Forage %>%
+sumForage <- df.Forage %>% # Sum all forage fish over species and areas
   group_by(Year) %>%
   summarise(Catch = sum(Catch, na.rm =T))
 
@@ -77,7 +75,7 @@ Mcatch <- matrix(NA, nspecies)
 SDcatch <- matrix(NA, nspecies)
 SEcatch <- matrix(NA, nspecies)
 
-for (i in 1:nspecies){
+for (i in 1:nspecies){ # Find the mean and SD of the catches 
   idx <- which(Forage$Species[Forage$Year > 1980] == species[i])
   Mcatch[i] <- mean(Forage$Catch[idx], na.rm =T)
   SDcatch[i] <- sd(Forage$Catch[idx], na.rm =T)
@@ -92,7 +90,7 @@ year <- seq(2012,2050)
 newdata <- data.frame(year = year, Cmedian = mean(sumForage$Catch[sumForage$Year > 1980], na.rm = T),
                       SE = sd(sumForage$Catch))
 
-# Plot in ggplot 
+# Create some dataframes for ggplot 
 sumForage$scenario <- 'Historic Catch'
 sumForage$SE <- NA
 
@@ -109,12 +107,6 @@ proj <- data.frame(Year = rep(c(2012,2050),length(feed.projection$Mean)*2),
                    Catch = tmp, 
                    SE = rep(feed.projection$SE,each = 2), 
                    scenario = rep(feed.projection$Scenario,each = 2))
-
-## Remove some of the scenarions keep for later
-# scns <- unique(proj$scenario)
-# proj <- proj[-which(proj$scenario == scns[5]),]
-# proj <- proj[-which(proj$scenario == scns[6]),]
-# proj <- proj[-which(proj$scenario == scns[1]),]
 
 # Make exponential growth towards 2050
 scns <- unique(proj$scenario)
@@ -139,31 +131,19 @@ for (i in 1:length(scns)){
 pelfish <- data.frame(Year = feed.history$Year,
                       Catch = feed.history$Pelagic.Fish, scenario = 'Feed use', SE = NA)
 
+# sum of MSY
+SE <- c(sum(CatchMSY$quantile05msy),sum(CatchMSY$quantilemsyr95))
 
-# sumForage.plot <- rbind(sumForage,newdata, proj, pelfish) # for plotting
-# sumForage.feed <- rbind(proj,pelfish)
-
-df.msy.all.2 <- read.csv('CatchMSY_Nis_FAOAreas_Rtest.csv', sep =',')
-df.msy.all.2$stock <- paste(df.msy.all.2$Species,df.msy.all.2$Area)
-df.msy.all.2 <- df.msy.all.2[-which(duplicated(df.msy.all.2$stock) == 1),]# remove dupes  
-
-
-F50 <- read.csv('F_50Fmsy_median.csv')
-# sum of MSY 
-SE <- c(sum(df.msy.all$quantile05msy),sum(df.msy.all$quantilemsyr95))
-
-df.tmp = data.frame(Catch = c(sumForage$Catch[length(sumForage$Catch)], sum(df.msy.all$median.msy.)),
+df.tmp = data.frame(Catch = c(sumForage$Catch[length(sumForage$Catch)], sum(CatchMSY$median.msy.)),
                     Year = c(2012,2050))
 
-y.ml <- lm(log(Catch) ~ Year, data = df.tmp)
-y.pred <- exp(predict(y.ml, newdata = data.frame(Year = yr)))
 y.pred <- rep(df.tmp$Catch[2], length(yr))
 
 # Find the difference between median and SE's
-SE.diff <- c(sum(df.msy.all$median.msy.)-SE[1],SE[2]-sum(df.msy.all$median.msy.)) 
-
+SE.diff <- c(sum(CatchMSY$median.msy.)-SE[1],SE[2]-sum(CatchMSY$median.msy.))
+# 
 MSY <- data.frame(Catch = y.pred,
-                  Year = yr,scenario = 'MSY', SE.min = y.pred-SE.diff[1], SE.max = y.pred+SE.diff[2])
+                   Year = yr,scenario = 'MSY', SE.min = y.pred-SE.diff[1], SE.max = y.pred+SE.diff[2])
 
 
 # Plot the feed scenarios and the catch scenarios 
@@ -211,7 +191,7 @@ p1 <- ggplot(df.plot, aes(x = Year, y = Catch*1e-6, color = scenario))+
 windows(width = 3.15*2*2/3, height = 3.5)  
 p1
 #legend.box.background = element_rect()
-print(paste('MSY Increase over 2012 catch =', (MSY$Catch[1]/sumForage$Catch[length(sumForage$Catch)]-1)*100), '%')
+print(paste('MSY Increase over 2012 catch =', (MSY$Catch[1]/sumForage$Catch[length(sumForage$Catch)]-1)*100, '%'))
 # Biomass
 print(paste('MSY Increase over 2012 catch =', (MSY$Catch[1]-sumForage$Catch[length(sumForage$Catch)])*1e-6, 'million tonnes'))
 
@@ -220,20 +200,8 @@ print(paste('MSY Increase over 2012 catch =', (MSY$Catch[1]-newdata$Catch[1])*1e
 
 # Forage fish reductions 
 
-print(paste('50 % decrease = ', sum(df.msy.all$mediank)*0.2*1e-6*0.9)) # 0.9 is availability for consumption
-print(paste('20 % decrease = ', MSY$Catch[1]*0.8*1e-6*0.9))
-
-# Calculate potential increase in catch
-#  scale_fill_manual("Catch", values = 1:9)
-# Difference between use and catch 
-
-cairo_pdf('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/TotalUSE.pdf', width = 3.15*2*2/3, height = 3.5)
-p1
-dev.off()
-
-jpeg('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/TotalUSE.jpg', width = 3.15*2*2/3, height = 3.5, unit = 'in', res = 1200)
-p1
-dev.off()
+print(paste('50 % decrease = ', sum(CatchMSY$mediank)*0.2*1e-6*0.9)) # 0.9 is availability for consumption
+print(paste('20 % decrease = ', MSY$Catch[1]*0.8*1e-6*0.9)) # 0.9 is availability for consumption
 
 # Print the years where they cross mean supply and MSY
 scenarios <- unique(df.plot$scenario)
@@ -270,13 +238,8 @@ for(i in 1:length(scenarios)){
   
   
 }
-# df.yr.cross$yr.msy[df.yr.cross$yr.msy == 2050] <- NA
-# df.yr.cross$yr.med[df.yr.cross$yr.med == 2050] <- NA
 df.yr.cross$yr.msy[df.yr.cross$yr.msy == 2012] <- NA
 df.yr.cross$yr.med[df.yr.cross$yr.med == 2012] <- NA
-#df.yr.cross$yr.yr.msy20[df.yr.cross$yr.msy20 == 2050] <- NA
-# df.yr.cross$yr.yr.mid.max[df.yr.cross$yr.mid.max == 2050] <- NA
-# df.yr.cross$yr.mid.min[df.yr.cross$yr.mid.min == 2050] <- NA
 df.yr.cross$yr.msy20[df.yr.cross$yr.msy20 == 2012] <- NA
 df.yr.cross$yr.med[df.yr.cross$yr.med == 2012] <- NA
 df.yr.cross$yr.mid.max[df.yr.cross$yr.mid.max == 2012] <- NA
@@ -284,12 +247,10 @@ df.yr.cross$yr.mid.min[df.yr.cross$yr.mid.min == 2012] <- NA
 
 df.yr.cross
 
-jpeg('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/TotalUSE_yrs.jpg', width = 3.15*2*2/3, height = 3.5, unit = 'in', res = 1200)
-
 p1 + geom_point(data = df.yr.cross, aes(x = yr.msy, y = yr.msy.c*1e-6))+
   geom_point(data = df.yr.cross, aes(x = yr.med, y = yr.med.c*1e-6))
 
-dev.off()
+p1
 write.table(df.yr.cross, 'omega_deficit_years.csv', row.names = F, sep = ',')
 
 # Add the barplot to fig 2 
@@ -306,88 +267,5 @@ p2 <- ggplot(data = df.spec, aes(y = Current_Mean_scaled, x= as.factor(Group)))+
   theme(legend.position='none',
         plot.margin=unit(c(0.1,0.1,0.2,-1), "cm"),text = element_text(size=8))
 
-grid.arrange(p1,p2, ncol = 2)
-
-# 
-cairo_pdf('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/speccontr.pdf', width = 3.15, height = 3.15/2)
 p2
-dev.off()
-
-jpeg('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/speccontr.jpg', width = 3.15*2, height = 3.15, unit = 'in', res = 1200)
-p2
-dev.off()
-
-
-
-### PLot the two figures in the same graph 
-cairo_pdf('C:/Users/Nis/Dropbox/UW/Aquaculture Halley/Figures/speccontr.pdf', width = 3.15*2, height = 3.15)
-grid.arrange(p1,p2, ncol = 2)
-dev.off()
-# 
-# vp <- viewport(width =0.1, height = 0.1, x = 1950,
-#                y = unit(0.7, "lines"), just = c("left",
-#                                                 "top"))
-# 
-# 
-# full <- function() {
-#   print(p1)
-#   print(p2, vp = vp)
-#   
-# }
-# 
-# 
-# full()
-# 
-
-# Difference between use and catch 
-
-
-
-yr <- 1961:2012
-diff.c <- sumForage$Catch[sumForage$Year > (min(pelfish$Year)-1)]-pelfish$Catch[pelfish$Year < (max(sumForage$Year)+1)] 
-plot(yr, diff.c, type = 'l')
-ml1 <- lm(diff.c ~ yr) 
-abline(ml1)
-summary(ml1)
-
-
-yr <- 1980:2012
-diff.c <- pelfish$Catch[pelfish$Year < 2013 & pelfish$Year> 1979]/sumForage$Catch[sumForage$Year > 1979]
-
-cff <- coef(ml1 <- lm(diff.c ~ yr)) 
-
-p3 <- ggplot(data.frame(yr = yr, diff.c = diff.c), aes(x = yr, y = diff.c))+geom_line()+geom_point()+theme_classic()+
-  geom_smooth(method='lm', fill = 'blue', alpha = 0.2)+scale_y_continuous('fraction of total catch')+scale_x_continuous('Year')
-p3
-
-jpeg(filename = 'fractionofcatch.jpg', width = 16,height = 16, unit = 'cm', res = 600)
-p3
-dev.off()
-
-
-# How large of a fraction of the catch is the total msy calculation in 2012 
-
-
-df.tmp <- df.Forage[df.Forage$Year == 2012,]
-# Remove dupes 
-df.tmp <- df.tmp[-which(duplicated(df.tmp$stock) == 1),] # Need to find those dupes later 
-
-
-df.msy.all$stock2 <- paste(df.msy.all$Species,df.msy.all$Area, sep = '-')
-nstocks <- length(df.tmp$stock)
-
-ixvec <- matrix(0, nstocks)
-for (i in 1:nstocks){
-  ixtmp <- which(df.tmp$stock[i] == df.msy.all$stock2)  
-  
-  if(length(ixtmp) > 0){
-    ixvec[i] = 1
-  }
-}
-
-
-# Sum UP! 
-sum(df.tmp[ixvec == 1,]$Catch, na.rm = T)/sum(df.tmp$Catch, na.rm = T)
-# Number of speices 
-length(unique(df.msy.all$Species))
-
+#

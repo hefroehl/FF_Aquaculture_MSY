@@ -1,0 +1,13 @@
+Group,Current_Mean,Current_SD,Current_Mean_scaled,Current_SD_scaled,ID
+pig,4530342,249756,4.53,0.25,AG
+carps,2656671,725437,2.66,0.73,AQ
+freshwater fish,2558268,708966,2.56,0.71,AQ
+shrimp,2337862,481913,2.34,0.48,AQ
+marine fish,2162441,531989,2.16,0.53,AQ
+salmon,1563585,803088,1.56,0.80,AQ
+freshwater crustaceans,1013629,298286,1.01,0.30,AQ
+trout,688481,149738,0.69,0.15,AQ
+poultry,556471,32896,0.56,0.03,AG
+eel,546621,82556,0.55,0.08,AQ
+diadromous fish,174338,33569,0.17,0.03,AQ
+tilapia,105583,27325,0.11,0.03,AQ
