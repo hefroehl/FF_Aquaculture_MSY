@@ -8,15 +8,18 @@ set.seed(1000)
 
 ## Read FAO data 
 df.fao <- read.csv('marinecatches.csv')
+head(df.fao)
 
 idx <- which(df.fao$size == 'Small')
 df.forage <- df.fao[idx,]
 areas <- unique(df.fao$Fishingarea)
-# Plot all the forage catches 
 
+# Plot all the forage catches 
 df.tot <- df.forage %>%
   group_by(Year) %>%
-  summarise(Catch = sum(Catch, na.rm = T)) 
+  summarise(Catch = sum(Catch, na.rm = T))
+
+head(df.tot)
 
 ggplot(df.tot, aes(x = Year, y = Catch*1e-6))+geom_line()+theme_classic()+scale_y_continuous('Total Catch')
 
@@ -24,6 +27,7 @@ sp <- unique(df.forage$Species)
 
 # Create a new data frame with unique stocks per fishing area 
 df.forage$stock <- paste(df.forage$Species,df.forage$Fishingarea, sep = '-')
+head(df.forage)
 
 stock <- unique(df.forage$stock)
 stock <- rev(stock) # ORdered with smallest catch in the beginning
